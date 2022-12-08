@@ -7,11 +7,11 @@
 #include <hal\hal.h>
 #include <RocketScream_LowPowerAVRZero.h>
 #include <CayenneLPP.h>
+#include <lecturaDatos.h>
 
 unsigned long tiempo;
 int lectura, hora, minutos, segundos, milisegundos;
 volatile byte contador;
-unsigned long inicioCuentaAtras;      // Variable genérica para controlar tiempos en bucles.
 volatile boolean envioEnCurso = true; // Hay un envío en curso, no poner el microcontrolador a dormir.
 
 // Tamaño de los datos enviados a Cayenne.
@@ -22,7 +22,6 @@ CayenneLPP lpp(4 + 4); // Térmometro + Lectura de batería
 void wakeUp(void);
 void pulsador(void);
 void do_send(osjob_t *j);
-void lecturaDatos();
 
 /*******************************************************
  * Pines del ATmega4808 no utilizados en la aplicación *
@@ -49,10 +48,6 @@ static const u1_t PROGMEM APPKEY[16] = {APPKEY_DISPOSITIVO_01};
 void os_getDevKey(u1_t *buf) { memcpy_P(buf, APPKEY, 16); }
 // ############################################################################
 
-// Datos conversor ADC
-const double tensionReferencia = 1.5, resolucionLectura = 1023;
-// Sensor de temperatura.
-double temperatura, lecturaTMP36, tension;
 
 static osjob_t sendjob;
 
@@ -210,34 +205,15 @@ void do_send(osjob_t *j)
     }
     else
     {
-        /* 
+        /*
         Prepara el envío de datos en el próximo momento posible.
         Enviamos los datos en el formato de Cayenne.
         */
 
-        // Encendemos el termómetro.
-        digitalWrite(TMP36_POWER, HIGH);
-
-        // Esperamos a que se complete el tiempo de encendido.
-        inicioCuentaAtras = millis();
-        while (millis() - inicioCuentaAtras < TMP36_TIEMPO_ENCENDIDO)
-        {
-        }
-
-        // Una ve que ha pasado el tiempo de encendido leemos el valor.
-        lecturaTMP36 = analogRead(TMP36_DATA);
-
-        // Una vez leida la temperatura apagamos el termómetro.
-        digitalWrite(TMP36_POWER, LOW);
-
-        // Ahora convertimos la lectura a voltios.
-        tension = tensionReferencia * lecturaTMP36 / resolucionLectura;
-
-        // Ya tenemos la tensión, ahora la pasamos a grados.
-        temperatura = (tension - TMP36_V_A_0_GRADOS) * 100.0;
+        // Lee la temperatura del termómetro TMP36
 
         lpp.reset();
-        lpp.addAnalogInput(1, temperatura);                       // Añadimos el sensor de temperatura.
+        lpp.addAnalogInput(1, lecturaDatos());                       // Añadimos el sensor de temperatura.
         lpp.addAnalogInput(2, ADC_BateriaLeerVoltaje() / 1000.F); // Batería en Voltios.
         LMIC_setTxData2(1, lpp.getBuffer(), lpp.getSize(), 0);
 #if defined(DEBUG)
@@ -290,8 +266,7 @@ void setup()
     // Iniciar un trabajo (el envío también inicia automáticamente OTAA)
     do_send(&sendjob);
 
-
-    /* Utilizando 1.5V como tensión de referencia cubrimos todo el rango de temperaturas 
+    /* Utilizando 1.5V como tensión de referencia cubrimos todo el rango de temperaturas
        del TMP36 (-50 a 100) grados centigrados.
        Se puede utilizar como tensión de referencia 1.1V para aumentar la precisión de las
        medidas. El rango de temperaturas cubierto sería de -50 a 60.
@@ -306,7 +281,7 @@ void setup()
     pinMode(TPL5010_WAKE, INPUT);
     pinMode(TPL5010_DONE, OUTPUT);
 
-    pinMode(LED_BUILTIN, OUTPUT);  // LED
+    pinMode(LED_BUILTIN, OUTPUT); // LED
 
     // Generamos el pulso de DONE del TPL5010
     // El TPL5010 comienza a funcionar.
@@ -386,35 +361,3 @@ void wakeUp(void)
     }
 }
 
-// Lee la temperatura del termometro y la tensión de la bateria.
-void lecturaDatos()
-{
-    // Encendemos el termómetro.
-    digitalWrite(TMP36_POWER, HIGH);
-
-    // Esperamos a que se complete el tiempo de encendido.
-    inicioCuentaAtras = millis();
-    while (millis() - inicioCuentaAtras < TMP36_TIEMPO_ENCENDIDO)
-    {
-    }
-
-    // Una ve que ha pasado el tiempo de encendido leemos el valor.
-    lecturaTMP36 = analogRead(TMP36_DATA);
-
-    // Una vez leida la temperatura apagamos el termómetro.
-    digitalWrite(TMP36_POWER, LOW);
-
-    // Ahora convertimos la lectura a voltios.
-    tension = tensionReferencia * lecturaTMP36 / resolucionLectura;
-
-    // Ya tenemos la tensión, ahora la pasamos a grados.
-    temperatura = (tension - TMP36_V_A_0_GRADOS) * 100.0;
-
-    // Pasamos los datos a formato Cayenne
-    lpp.reset();
-    lpp.addAnalogInput(1, temperatura);
-    lpp.addAnalogInput(2, ADC_BateriaLeerVoltaje()); // Batería en Voltios.
-    // #if defined(DEBUG)
-    //   grabaRegistro(EV_LECTURADATOS);
-    // #endif
-}
