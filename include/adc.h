@@ -2,7 +2,7 @@
 *Funciones relacionadas con el uso del ADC
 */
 #ifndef ADC_H
-#define ADCH
+#define ADC_H
 
 #include <Arduino.h>
 #include <avr/io.h>

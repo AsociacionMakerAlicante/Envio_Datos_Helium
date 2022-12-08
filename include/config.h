@@ -1,8 +1,9 @@
-#pragma once
+#ifndef __CONFIG__
+#define __CONFIG__
 
 #include <Arduino.h>
 // Define si el programa se compila en modo "DEPURACIÓN"
-#define DEBUG
+#define NO_DEBUG
 // -----------------------------------------------------
 
 // Definiciones para el termometro.
@@ -12,3 +13,4 @@
 #define TMP36_TIEMPO_ENCENDIDO 2
 #define MINUTOS_ENVIO 1 // Cada X minutos realizamos un envío.
 
+#endif
